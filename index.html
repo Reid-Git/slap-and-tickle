@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Slap & Tickle (Adult Party Game)</title>
+    <style>
+        :root {
+            --bg-color: #0f0c1b;
+            --card-color: #1d1836;
+            --accent-color: #ff007f;
+            --text-color: #ffffff;
+            --correct-color: #00ff66;
+            --pass-color: #ff3333;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
+        .screen {
+            display: none;
+            width: 100%;
+            height: 100%;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        .active {
+            display: flex;
+        }
+
+        h1 {
+            font-size: 3rem;
+            color: var(--accent-color);
+            margin-bottom: 10px;
+            text-shadow: 0 0 15px rgba(255, 0, 127, 0.6);
+            font-weight: 900;
+            letter-spacing: 1px;
+        }
+
+        p {
+            font-size: 1.1rem;
+            margin-bottom: 25px;
+            color: #b0a8d3;
+            max-width: 80%;
+        }
+
+        .btn {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 1.3rem;
+            font-weight: bold;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(255, 0, 127, 0.4);
+            transition: transform 0.1s ease;
+            margin-top: 10px;
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+        }
+
+        .word-display {
+            font-size: 3.5rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            word-break: break-word;
+            padding: 0 20px;
+            margin-bottom: 20px;
+            max-width: 90%;
+        }
+
+        .timer {
+            font-size: 2rem;
+            font-weight: bold;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 5px 20px;
+            border-radius: 20px;
+            margin-bottom: 40px;
+        }
+
+        .instruction-hint {
+            position: absolute;
+            bottom: 20px;
+            font-size: 1rem;
+            opacity: 0.6;
+            color: #ffffff;
+        }
+
+        .flash-correct { background-color: #004d1f !important; }
+        .flash-pass { background-color: #4d0000 !important; }
+        .flash-tilt { background-color: #3b3166 !important; }
+
+        .score-title {
+            font-size: 2rem;
+            margin-bottom: 20px;
+        }
+
+        .score-num {
+            font-size: 5rem;
+            font-weight: bold;
+            color: var(--correct-color);
+            margin-bottom: 30px;
+        }
+
+        @media (orientation: portrait) {
+            .portrait-warning {
+                display: flex;
+                background: var(--bg-color);
+                z-index: 999;
+            }
+        }
+
+        @media (orientation: landscape) {
+            .portrait-warning {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Orientation Screen -->
+    <div class="screen portrait-warning active">
+        <h1>🙃 Flip Your Phone!</h1>
+        <p>Slap & Tickle is played horizontally. Turn your device sideways to begin.</p>
+    </div>
+
+    <!-- Start Screen -->
+    <div id="start-screen" class="screen">
+        <h1>Slap & Tickle</h1>
+        <p>The Adult Heads-Up Game. Tilt down to score, tilt up to pass. Place the phone against your forehead!</p>
+        <button class="btn" onclick="requestPermissionAndStart()">START ROUND</button>
+    </div>
+
+    <!-- Gameplay Screen -->
+    <div id="game-screen" class="screen" style="background-color: var(--card-color);">
+        <div class="timer" id="timer-display">60</div>
+        <div class="word-display" id="word-display">READY?</div>
+        <div class="instruction-hint">Tilt Down = Slap (Score) | Tilt Up = Tickle (Pass)</div>
+    </div>
+
+    <!-- Score Screen -->
+    <div id="score-screen" class="screen">
+        <div class="score-title">Round Over! Total Score:</div>
+        <div class="score-num" id="final-score">0</div>
+        <button class="btn" onclick="showStartScreen()">PLAY AGAIN</button>
+    </div>
+
+    <script>
+        const wordBank = [
+            /* ADD YOUR CUSTOM PHRASES HERE BELOW: */
+            “Helmet”, “Clunge”, “Bell End”, “Minge”, “Lady Garden”, “Spunk Junky”, “Arse Bandit”, “Fingering”, “Piss Funnel”, “Scissor Sisters”, “Double-ender”, “69”, “Teabagging”, “Orgy”, “Lick The Clit”, “Dogging”, “Shaven Haven”, “Lick The Shaft”, “Lube His Balls Up”, “Nipple Clamp”, “Facial”, “Rug Muncher”, “Nudist”, “Dutch Oven”, “Circle Jerk”, “Fucked Senseless”, “Licking The Rim”, “Talking Dirty”, “Hand Job”, “Voyeur”, “Crotchless Panties”,”Double Penetration”, “Reverse Cowgirl”, “Doggy Style”, “Cunnilingus”, “Fellatio”, “Blindfold”, "Slap & Tickle", "Mooning", "Pleasuring Yourself", "Deep Throating", 
+            
+            /* Main Game Deck */
+            "Shagging", "Wanker", "Bollocks", "Muffed It", "Bugger", "Arse over Tit", "Snogging", 
+            "Bellend", "Getting Legless", "Knickerless", "Pissed Up", "Tits Up", "Slagging Off", 
+            "Randy", "Taking the Piss", "Gobshite", "Tosser", "Skank", "Boffing", "Plonker", "Starkers",
+       
+            "Morning Glory", "Beer Goggles", "One Night Stand", "Skinny Dipping", "Mile High Club",
+            "Sexting", "Thirst Trap", "Ghosting", "Catfished”,”French Kissing", "Hickey",
+
+            "Making Out", "Heavy Petting", "Birthday Suit", "Pillow Talk", "Dirty Dancing",
+
+            "Hot Flash", "Curtain Twitcher", "Frisky", "Flashing", "Streaking", "Double Date", "Third Wheel",
+            
+           "Forbidden Fruit", "Sneaky Link", "Friends Row", "Backseat Action", "Quickie", "Tupence", "Sausage Roll",
+           
+            "Slapper", "Gorgon", "Trollop", "Minger","Hen Do", "Stag Do", "Stripper", "Lap Dance", "Pole Dancing", "Red Light District",
+
+            "Sin City", "Boudoir", "Lingerie", "Silk Sheets", "Whipped Cream", "Chocolate Sauce", "Blindfold",
+            "Handcuffs", "Spanking", "Roleplay", "French Maid", "Naughty Nurse", "Pool Boy", "Massager",
+            "Love Potion", "Aphrodisiac", "Oysters", "Strawberries & Champagne", "Hot Tub Party", "Skin to Skin”, “Under The Covers”,
+            
+            "Heart Throb", "Femme Fatale", "Ladykiller", "Casanova", "Don Juan", "Lothario", "Playboy", "Playmate",
+            "Pin-up", "Page 3", "Glamour Model", "Throbber", "Stiff One", “Group Shower", "X-Rated",
+            "Adult Movie", "Casting Couch”,"Explicit Content", "Nudity",
+
+            "Double Entendre", "Innuendo", "Sultry Voice", "Come-hither Look", "Bedroom Eyes", "Flirty Text", "Late Night Call",
+            "Sneaking Out", "Sneaking In", "Creeping", "Caught In The Act", "Red Handed"
+
+            "Obsession", "Infatuation", "Crush", "Secret Admirer", "Unrequited Love", "Friend Zone", "Deep End",
+            
+        ];
+
+        let currentWords = [];
+        let score = 0;
+        let timeLeft = 60;
+        let timerInterval = null;
+        let isTiltLocked = false; 
+
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => {
+                if(!s.classList.contains('portrait-warning')) s.classList.remove('active');
+            });
+            document.getElementById(screenId).classList.add('active');
+        }
+
+        function checkOrientation() {
+            if (window.innerHeight < window.innerWidth) {
+                if (!document.getElementById('game-screen').classList.contains('active') && 
+                    !document.getElementById('score-screen').classList.contains('active')) {
+                    showScreen('start-screen');
+                }
+            }
+        }
+
+        window.addEventListener('resize', checkOrientation);
+        window.addEventListener('load', checkOrientation);
+
+        function showStartScreen() {
+            showScreen('start-screen');
+        }
+
+        function requestPermissionAndStart() {
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                DeviceOrientationEvent.requestPermission()
+Use code with caution.
+
+.then(permissionState => {
+if (permissionState === 'granted') {
+window.addEventListener('deviceorientation', handleOrientation);
+startGame();
+} else {
+alert('Sensor access denied.');
+startGame();
+}
+})
+.catch(console.error);
+} else {
+window.addEventListener('deviceorientation', handleOrientation);
+startGame();
+}
+}
+function startGame() {
+currentWords = [...wordBank].sort(() => 0.5 - Math.random());
+score = 0;
+timeLeft = 60;
+isTiltLocked = true;
+document.getElementById('timer-display').innerText = timeLeft;
+showScreen('game-screen');
+document.getElementById('word-display').innerText = "PLACE ON FOREHEAD...";
+setTimeout(() => {
+isTiltLocked = false;
+nextWord();
+}, 1500);
+clearInterval(timerInterval);
+timerInterval = setInterval(() => {
+if(!isTiltLocked) {
+timeLeft--;
+document.getElementById('timer-display').innerText = timeLeft;
+if (timeLeft <= 0) {
+endGame();
+}
+}
+}, 1000);
+}
+function nextWord() {
+if (currentWords.length === 0) {
+currentWords = [...wordBank].sort(() => 0.5 - Math.random());
+}
+const word = currentWords.pop();
+document.getElementById('word-display').innerText = word;
+}
+function handleOrientation(event) {
+if (isTiltLocked || !document.getElementById('game-screen').classList.contains('active')) return;
+let tilt = event.gamma;
+if (tilt > 55) {
+triggerAction('correct');
+} else if (tilt < -55) {
+triggerAction('pass');
+}
+}
+function triggerAction(action) {
+isTiltLocked = true;
+const gameScreen = document.getElementById('game-screen');
+if (action === 'correct') {
+score++;
+document.getElementById('word-display').innerText = "SLAP! 💥";
+gameScreen.classList.add('flash-correct');
+} else if (action === 'pass') {
+document.getElementById('word-display').innerText = "TICKLE! 🪶";
+gameScreen.classList.add('flash-pass');
+}
+setTimeout(() => {
+gameScreen.classList.remove('flash-correct', 'flash-pass');
+document.getElementById('word-display').innerText = "STAND UPRIGHT";
+gameScreen.classList.add('flash-tilt');
+const checkReturnInterval = setInterval(() => {
+let currentTilt = 0;
+window.addEventListener('deviceorientation', function capture(e) {
+currentTilt = e.gamma;
+window.removeEventListener('deviceorientation', capture);
+});
+if (currentTilt > -20 && currentTilt < 20) {
+clearInterval(checkReturnInterval);
+gameScreen.classList.remove('flash-tilt');
+nextWord();
+isTiltLocked = false;
+}
+}, 100);
+}, 800);
+}
+function endGame() {
+clearInterval(timerInterval);
+document.getElementById('final-score').innerText = score;
+showScreen('score-screen');
+}
