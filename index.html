@@ -118,8 +118,8 @@
             z-index: 5;
         }
 
-        /* Tiny camera preview window so you can see it's recording */
         #camera-preview {
+            display: none; /* Hidden by default unless active and supported */
             position: absolute;
             top: 15px;
             right: 15px;
@@ -129,7 +129,7 @@
             border: 2px solid rgba(255, 255, 255, 0.3);
             object-fit: cover;
             background: #000;
-            transform: scaleX(-1); /* Mirrors front camera */
+            transform: scaleX(-1);
             z-index: 5;
         }
 
@@ -223,19 +223,17 @@
         let timerInterval = null;
         let isTiltLocked = false; 
 
-        // Camera & Recording variables
         let mediaStream = null;
         let mediaRecorder = null;
         let recordedChunks = [];
-
-        // Audio Synthesis Context
         let audioCtx = null;
 
         function showScreen(screenId) {
             document.querySelectorAll('.screen').forEach(s => {
                 if(!s.classList.contains('portrait-warning')) s.classList.remove('active');
             });
-            document.getElementById(screenId).classList.add('active');
+            const target = document.getElementById(screenId);
+            if (target) target.classList.add('active');
         }
 
         function showStartScreen() {
@@ -243,179 +241,26 @@
             document.getElementById('video-status').innerText = "";
         }
 
-        // Initialize Audio context on user gesture
         function initAudio() {
             if (!audioCtx) {
                 audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             }
         }
 
-        // Programmatic sound synthesizers
         function playSound(type) {
             if (!audioCtx) return;
-            
-            let osc = audioCtx.createOscillator();
-            let gain = audioCtx.createGain();
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
+            try {
+                let osc = audioCtx.createOscillator();
+                let gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
 
-            if (type === 'correct') {
-                // Happy high ding chime
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5
-                osc.frequency.setValueAtTime(880.00, audioCtx.currentTime + 0.1); // A5
-                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-Use code with caution.
-
-gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
-osc.start();
-osc.stop(audioCtx.currentTime + 0.4);
-} else if (type === 'pass') {
-// Lower error buzzer sound
-osc.type = 'sawtooth';
-osc.frequency.setValueAtTime(220.00, audioCtx.currentTime); // A3
-osc.frequency.linearRampToValueAtTime(110.00, audioCtx.currentTime + 0.2); // A2
-gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
-gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
-osc.start();
-osc.stop(audioCtx.currentTime + 0.3);
-}
-}
-// Requests motion data + front camera video tracks
-async function requestPermissionsAndStart() {
-initAudio();
-// 1. Handle Camera Request
-try {
-mediaStream = await navigator.mediaDevices.getUserMedia({
-video: { facingMode: "user" }, // Force front camera
-audio: true
-});
-document.getElementById('camera-preview').srcObject = mediaStream;
-} catch (err) {
-console.error("Camera access failed:", err);
-alert("Camera access is required so we can record your friends laughing!");
-return;
-}
-// 2. Handle Motion Sensors
-if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-DeviceOrientationEvent.requestPermission()
-.then(permissionState => {
-if (permissionState === 'granted') {
-startGame();
-} else {
-alert("Motion controls are required to play!");
-}
-})
-.catch(console.error);
-} else {
-startGame();
-}
-}
-function startGame() {
-currentWords = [...wordBank].sort(() => Math.random() - 0.5);
-score = 0;
-timeLeft = 60;
-isTiltLocked = false;
-recordedChunks = [];
-// Start Recording Video Feed
-try {
-let options = { mimeType: 'video/webm;codecs=vp9,opus' };
-if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-options = { mimeType: 'video/mp4' }; // Fallback target for iOS devices
-}
-mediaRecorder = new MediaRecorder(mediaStream, options);
-mediaRecorder.ondataavailable = (e) => {
-if (e.data.size > 0) recordedChunks.push(e.data);
-};
-mediaRecorder.onstop = saveVideoFile;
-mediaRecorder.start();
-} catch(e) {
-console.warn("MediaRecorder setup failed, proceeding without active recording capture.", e);
-}
-document.getElementById('timer-display').innerText = timeLeft;
-showScreen('game-screen');
-nextWord();
-window.removeEventListener('deviceorientation', handleOrientation);
-window.addEventListener('deviceorientation', handleOrientation);
-clearInterval(timerInterval);
-timerInterval = setInterval(() => {
-timeLeft--;
-document.getElementById('timer-display').innerText = timeLeft;
-if (timeLeft <= 0) {
-endGame();
-}
-}, 1000);
-}
-function nextWord() {
-if (currentWords.length === 0) {
-endGame();
-return;
-}
-document.getElementById('word-display').innerText = currentWords.pop();
-}
-function handleOrientation(event) {
-if (isTiltLocked) return;
-let targetAngle = window.orientation === 90 ? event.gamma : -event.gamma;
-if(Math.abs(event.beta) < 30) {
-targetAngle = event.gamma;
-}
-if (targetAngle > 40) {
-triggerAction('correct');
-} else if (targetAngle < -40) {
-triggerAction('pass');
-}
-}
-function triggerAction(action) {
-isTiltLocked = true;
-const gameScreen = document.getElementById('game-screen');
-if (action === 'correct') {
-score++;
-playSound('correct');
-gameScreen.classList.add('flash-correct');
-document.getElementById('word-display').innerText = "SLAP! (Score)";
-} else {
-playSound('pass');
-gameScreen.classList.add('flash-pass');
-document.getElementById('word-display').innerText = "TICKLE! (Pass)";
-}
-setTimeout(() => {
-gameScreen.classList.remove('flash-correct', 'flash-pass');
-nextWord();
-setTimeout(() => { isTiltLocked = false; }, 400);
-}, 800);
-}
-function endGame() {
-clearInterval(timerInterval);
-window.removeEventListener('deviceorientation', handleOrientation);
-document.getElementById('final-score').innerText = score;
-// Stop Video Recording
-if (mediaRecorder && mediaRecorder.state !== "inactive") {
-document.getElementById('video-status').innerText = "Processing party video...";
-mediaRecorder.stop();
-}
-// Shut down active camera tracking streams safely
-if (mediaStream) {
-mediaStream.getTracks().forEach(track => track.stop());
-}
-showScreen('score-screen');
-}
-// Compiles video capture data and pushes an automated file download download
-function saveVideoFile() {
-const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType });
-const url = URL.createObjectURL(blob);
-const a = document.createElement('a');
-a.style.display = 'none';
-a.href = url;
-a.download = slap-and-tickle-round-${Date.now()}.mp4;
-document.body.appendChild(a);
-a.click();
-setTimeout(() => {
-document.body.removeChild(a);
-window.URL.revokeObjectURL(url);
-document.getElementById('video-status').innerText = "🎬 Video downloaded to your device files!";
-}, 100);
-}
-window.onload = () => {
-showStartScreen();
-};
-
+                if (type === 'correct') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(587.33, audioCtx.currentTime);
+                    osc.frequency.setValueAtTime(880.00, audioCtx.currentTime + 0.1);
+                    gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.4);
+Use code with caution.} else if (type === 'pass') {osc.type = 'sawtooth';osc.frequency.setValueAtTime(220.00, audioCtx.currentTime);osc.frequency.linearRampToValueAtTime(110.00, audioCtx.currentTime + 0.2);gain.gain.setValueAtTime(0.2, audioCtx.currentTime);gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);osc.start();osc.stop(audioCtx.currentTime + 0.3);}} catch(e) { console.error(e); }}async function requestPermissionsAndStart() {initAudio();// Safe iOS 14.4 fallback check for media devicesif (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {try {mediaStream = await navigator.mediaDevices.getUserMedia({video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },audio: true});const preview = document.getElementById('camera-preview');if (preview) {preview.srcObject = mediaStream;preview.style.display = 'block'; // Show preview only if supported}} catch (err) {console.warn("Camera explicitly blocked or unsupported in this browser view:", err);}} else {console.warn("navigator.mediaDevices is undefined on this iOS version/browser window wrapper.");}// iOS Motion Tracking Engine Checkif (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {try {const permissionState = await DeviceOrientationEvent.requestPermission();if (permissionState === 'granted') {startGame();} else {alert("Motion controls are required to play!");}} catch(e) {console.error("DeviceOrientation permission block bypassed gracefully:", e);startGame();}} else {startGame();}}function startGame() {currentWords = [...wordBank].sort(() => Math.random() - 0.5);score = 0;timeLeft = 60;isTiltLocked = false;recordedChunks = [];// Prevent engine lockouts if MediaRecorder constructor is unavailable (iOS 14.4 Safari bug)if (mediaStream && typeof MediaRecorder !== 'undefined') {try {let options = { mimeType: 'video/mp4' }; // Main wrapper extension type for iOS mobile environmentsif (!MediaRecorder.isTypeSupported || !MediaRecorder.isTypeSupported(options.mimeType)) {options = {}; // Clear configurations to rely on native baseline fallback layers}mediaRecorder = new MediaRecorder(mediaStream, options);mediaRecorder.ondataavailable = (e) => {if (e.data && e.data.size > 0) recordedChunks.push(e.data);};mediaRecorder.onstop = saveVideoFile;mediaRecorder.start();} catch(e) {console.warn("MediaRecorder execution failed on iOS 14. Running game cleanly without active video backup recording saves.", e);mediaRecorder = null;}}document.getElementById('timer-display').innerText = timeLeft;showScreen('game-screen');nextWord();window.removeEventListener('deviceorientation', handleOrientation);window.addEventListener('deviceorientation', handleOrientation);clearInterval(timerInterval);timerInterval = setInterval(() => {timeLeft--;document.getElementById('timer-display').innerText = timeLeft;if (timeLeft <= 0) {endGame();}}, 1000);}function nextWord() {if (currentWords.length === 0) {endGame();return;}document.getElementById('word-display').innerText = currentWords.pop();}function handleOrientation(event) {if (isTiltLocked) return;let targetAngle = window.orientation === 90 ? event.gamma : -event.gamma;if(Math.abs(event.beta) < 30) {targetAngle = event.gamma;}if (targetAngle > 40) {triggerAction('correct');} else if (targetAngle < -40) {triggerAction('pass');}}function triggerAction(action) {isTiltLocked = true;const gameScreen = document.getElementById('game-screen');if (action === 'correct') {score++;playSound('correct');gameScreen.classList.add('flash-correct');document.getElementById('word-display').innerText = "SLAP! (Score)";} else {playSound('pass');gameScreen.classList.add('flash-pass');document.getElementById('word-display').innerText = "TICKLE! (Pass)";}setTimeout(() => {gameScreen.classList.remove('flash-correct', 'flash-pass');nextWord();setTimeout(() => { isTiltLocked = false; }, 400);}, 800);}function endGame() {clearInterval(timerInterval);window.removeEventListener('deviceorientation', handleOrientation);document.getElementById('final-score').innerText = score;if (mediaRecorder && mediaRecorder.state !== "inactive") {document.getElementById('video-status').innerText = "Processing party video...";try { mediaRecorder.stop(); } catch(e) { console.error(e); }}if (mediaStream) {mediaStream.getTracks().forEach(track => track.stop());}showScreen('score-screen');}function saveVideoFile() {if (recordedChunks.length === 0) return;try {const blob = new Blob(recordedChunks, { type: (mediaRecorder && mediaRecorder.mimeType) ? mediaRecorder.mimeType : 'video/mp4' });const url = URL.createObjectURL(blob);const a = document.createElement('a');a.style.display = 'none';a.href = url;a.download = slap-and-tickle-${Date.now()}.mp4;document.body.appendChild(a);a.click();setTimeout(() => {document.body.removeChild(a);window.URL.revokeObjectURL(url);document.getElementById('video-status').innerText = "🎬 Video saved directly to downloads!";}, 100);} catch(e) {console.error("Video export save failed:", e);}}window.onload = () => {showStartScreen();};
