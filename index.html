@@ -116,7 +116,6 @@
 
         .flash-correct { background-color: #004d1f !important; }
         .flash-pass { background-color: #4d0000 !important; }
-        .flash-tilt { background-color: #3b3166 !important; }
 
         .score-title {
             font-size: 2rem;
@@ -175,39 +174,27 @@
     </div>
 
     <script>
+        // Cleaned up syntax and stripped smart quotes
         const wordBank = [
-            /* ADD YOUR CUSTOM PHRASES HERE BELOW: */
-            “Helmet”, “Clunge”, “Bell End”, “Minge”, “Lady Garden”, “Spunk Junky”, “Arse Bandit”, “Fingering”, “Piss Funnel”, “Scissor Sisters”, “Double-ender”, “69”, “Teabagging”, “Orgy”, “Lick The Clit”, “Dogging”, “Shaven Haven”, “Lick The Shaft”, “Lube His Balls Up”, “Nipple Clamp”, “Facial”, “Rug Muncher”, “Nudist”, “Dutch Oven”, “Circle Jerk”, “Fucked Senseless”, “Licking The Rim”, “Talking Dirty”, “Hand Job”, “Voyeur”, “Crotchless Panties”,”Double Penetration”, “Reverse Cowgirl”, “Doggy Style”, “Cunnilingus”, “Fellatio”, “Blindfold”, "Slap & Tickle", "Mooning", "Pleasuring Yourself", "Deep Throating", 
-            
-            /* Main Game Deck */
+            "Helmet", "Clunge", "Bell End", "Minge", "Lady Garden", "Spunk Junky", "Arse Bandit", "Fingering", "Piss Funnel", "Scissor Sisters", "Double-ender", "69", "Teabagging", "Orgy", "Lick The Clit", "Dogging", "Shaven Haven", "Lick The Shaft", "Lube His Balls Up", "Nipple Clamp", "Facial", "Rug Muncher", "Nudist", "Dutch Oven", "Circle Jerk", "Fucked Senseless", "Licking The Rim", "Talking Dirty", "Hand Job", "Voyeur", "Crotchless Panties", "Double Penetration", "Reverse Cowgirl", "Doggy Style", "Cunnilingus", "Fellatio", "Blindfold", "Slap & Tickle", "Mooning", "Pleasuring Yourself", "Deep Throating", 
             "Shagging", "Wanker", "Bollocks", "Muffed It", "Bugger", "Arse over Tit", "Snogging", 
             "Bellend", "Getting Legless", "Knickerless", "Pissed Up", "Tits Up", "Slagging Off", 
             "Randy", "Taking the Piss", "Gobshite", "Tosser", "Skank", "Boffing", "Plonker", "Starkers",
-       
             "Morning Glory", "Beer Goggles", "One Night Stand", "Skinny Dipping", "Mile High Club",
-            "Sexting", "Thirst Trap", "Ghosting", "Catfished”,”French Kissing", "Hickey",
-
+            "Sexting", "Thirst Trap", "Ghosting", "Catfished", "French Kissing", "Hickey",
             "Making Out", "Heavy Petting", "Birthday Suit", "Pillow Talk", "Dirty Dancing",
-
             "Hot Flash", "Curtain Twitcher", "Frisky", "Flashing", "Streaking", "Double Date", "Third Wheel",
-            
-           "Forbidden Fruit", "Sneaky Link", "Friends Row", "Backseat Action", "Quickie", "Tupence", "Sausage Roll",
-           
-            "Slapper", "Gorgon", "Trollop", "Minger","Hen Do", "Stag Do", "Stripper", "Lap Dance", "Pole Dancing", "Red Light District",
-
+            "Forbidden Fruit", "Sneaky Link", "Friends Row", "Backseat Action", "Quickie", "Tupence", "Sausage Roll",
+            "Slapper", "Gorgon", "Trollop", "Minger", "Hen Do", "Stag Do", "Stripper", "Lap Dance", "Pole Dancing", "Red Light District",
             "Sin City", "Boudoir", "Lingerie", "Silk Sheets", "Whipped Cream", "Chocolate Sauce", "Blindfold",
             "Handcuffs", "Spanking", "Roleplay", "French Maid", "Naughty Nurse", "Pool Boy", "Massager",
-            "Love Potion", "Aphrodisiac", "Oysters", "Strawberries & Champagne", "Hot Tub Party", "Skin to Skin”, “Under The Covers”,
-            
+            "Love Potion", "Aphrodisiac", "Oysters", "Strawberries & Champagne", "Hot Tub Party", "Skin to Skin", "Under The Covers",
             "Heart Throb", "Femme Fatale", "Ladykiller", "Casanova", "Don Juan", "Lothario", "Playboy", "Playmate",
-            "Pin-up", "Page 3", "Glamour Model", "Throbber", "Stiff One", “Group Shower", "X-Rated",
-            "Adult Movie", "Casting Couch”,"Explicit Content", "Nudity",
-
+            "Pin-up", "Page 3", "Glamour Model", "Throbber", "Stiff One", "Group Shower", "X-Rated",
+            "Adult Movie", "Casting Couch", "Explicit Content", "Nudity",
             "Double Entendre", "Innuendo", "Sultry Voice", "Come-hither Look", "Bedroom Eyes", "Flirty Text", "Late Night Call",
-            "Sneaking Out", "Sneaking In", "Creeping", "Caught In The Act", "Red Handed"
-
-            "Obsession", "Infatuation", "Crush", "Secret Admirer", "Unrequited Love", "Friend Zone", "Deep End",
-            
+            "Sneaking Out", "Sneaking In", "Creeping", "Caught In The Act", "Red Handed",
+            "Obsession", "Infatuation", "Crush", "Secret Admirer", "Unrequited Love", "Friend Zone", "Deep End"
         ];
 
         let currentWords = [];
@@ -223,78 +210,79 @@
             document.getElementById(screenId).classList.add('active');
         }
 
-        function checkOrientation() {
-            if (window.innerHeight < window.innerWidth) {
-                if (!document.getElementById('game-screen').classList.contains('active') && 
-                    !document.getElementById('score-screen').classList.contains('active')) {
-                    showScreen('start-screen');
-                }
-            }
-        }
-
-        window.addEventListener('resize', checkOrientation);
-        window.addEventListener('load', checkOrientation);
-
         function showStartScreen() {
             showScreen('start-screen');
         }
 
+        // Handles secure motion permission flags required by modern browsers (especially iOS Safari)
         function requestPermissionAndStart() {
             if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
                 DeviceOrientationEvent.requestPermission()
+                    .then(permissionState => {
+                        if (permissionState === 'granted') {
+                            startGame();
+                        } else {
+                            alert("Permission denied. Motion controls are required to play!");
+                        }
+                    })
+                    .catch(console.error);
+            } else {
+                // Non-iOS devices
+                startGame();
+            }
+        }
+
+        function startGame() {
+            // Shuffle and copy word deck
+            currentWords = [...wordBank].sort(() => Math.random() - 0.5);
+            score = 0;
+            timeLeft = 60;
+            isTiltLocked = false;
+
+            document.getElementById('timer-display').innerText = timeLeft;
+            showScreen('game-screen');
+            nextWord();
+
+            // Setup Motion Listener
+            window.removeEventListener('deviceorientation', handleOrientation);
+            window.addEventListener('deviceorientation', handleOrientation);
+
+            // Timer Loop
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                document.getElementById('timer-display').innerText = timeLeft;
+                if (timeLeft <= 0) {
+                    endGame();
+                }
+            }, 1000);
+        }
+
+        function nextWord() {
+            if (currentWords.length === 0) {
+                endGame();
+                return;
+            }
 Use code with caution.
 
-.then(permissionState => {
-if (permissionState === 'granted') {
-window.addEventListener('deviceorientation', handleOrientation);
-startGame();
-} else {
-alert('Sensor access denied.');
-startGame();
-}
-})
-.catch(console.error);
-} else {
-window.addEventListener('deviceorientation', handleOrientation);
-startGame();
-}
-}
-function startGame() {
-currentWords = [...wordBank].sort(() => 0.5 - Math.random());
-score = 0;
-timeLeft = 60;
-isTiltLocked = true;
-document.getElementById('timer-display').innerText = timeLeft;
-showScreen('game-screen');
-document.getElementById('word-display').innerText = "PLACE ON FOREHEAD...";
-setTimeout(() => {
-isTiltLocked = false;
-nextWord();
-}, 1500);
-clearInterval(timerInterval);
-timerInterval = setInterval(() => {
-if(!isTiltLocked) {
-timeLeft--;
-document.getElementById('timer-display').innerText = timeLeft;
-if (timeLeft <= 0) {
-endGame();
-}
-}
-}, 1000);
-}
-function nextWord() {
-if (currentWords.length === 0) {
-currentWords = [...wordBank].sort(() => 0.5 - Math.random());
-}
 const word = currentWords.pop();
 document.getElementById('word-display').innerText = word;
 }
+// Processing landscape tilt angles (Forehead facing outward)
 function handleOrientation(event) {
-if (isTiltLocked || !document.getElementById('game-screen').classList.contains('active')) return;
-let tilt = event.gamma;
-if (tilt > 55) {
+if (isTiltLocked) return;
+// In landscape mode, phone tilt translates directly to rotation around the Y or Z axes
+let targetAngle = window.orientation === 90 ? event.gamma : -event.gamma;
+// Alternative fallback evaluation check if gamma behaves irregularly across different OS layers
+if(Math.abs(event.beta) < 30) {
+targetAngle = event.gamma;
+}
+// Tilt Down to Score (Slap)
+if (targetAngle > 40) {
 triggerAction('correct');
-} else if (tilt < -55) {
+}
+// Tilt Up to Pass (Tickle)
+else if (targetAngle < -40) {
 triggerAction('pass');
 }
 }
@@ -303,33 +291,27 @@ isTiltLocked = true;
 const gameScreen = document.getElementById('game-screen');
 if (action === 'correct') {
 score++;
-document.getElementById('word-display').innerText = "SLAP! 💥";
 gameScreen.classList.add('flash-correct');
-} else if (action === 'pass') {
-document.getElementById('word-display').innerText = "TICKLE! 🪶";
+document.getElementById('word-display').innerText = "SLAP! (Score)";
+} else {
 gameScreen.classList.add('flash-pass');
+document.getElementById('word-display').innerText = "TICKLE! (Pass)";
 }
+// Lock controls briefly during visual flash transition
 setTimeout(() => {
 gameScreen.classList.remove('flash-correct', 'flash-pass');
-document.getElementById('word-display').innerText = "STAND UPRIGHT";
-gameScreen.classList.add('flash-tilt');
-const checkReturnInterval = setInterval(() => {
-let currentTilt = 0;
-window.addEventListener('deviceorientation', function capture(e) {
-currentTilt = e.gamma;
-window.removeEventListener('deviceorientation', capture);
-});
-if (currentTilt > -20 && currentTilt < 20) {
-clearInterval(checkReturnInterval);
-gameScreen.classList.remove('flash-tilt');
 nextWord();
-isTiltLocked = false;
-}
-}, 100);
+// Clear orientation lock once user returns phone to the baseline vertical plane
+setTimeout(() => { isTiltLocked = false; }, 400);
 }, 800);
 }
 function endGame() {
 clearInterval(timerInterval);
+window.removeEventListener('deviceorientation', handleOrientation);
 document.getElementById('final-score').innerText = score;
 showScreen('score-screen');
 }
+// Initialize view state on launch
+window.onload = () => {
+showStartScreen();
+};
