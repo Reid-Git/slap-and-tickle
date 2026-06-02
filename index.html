@@ -80,6 +80,7 @@
             box-shadow: 0 5px 15px rgba(255, 0, 127, 0.4);
             transition: transform 0.1s ease;
             margin-top: 10px;
+            z-index: 10;
         }
 
         .btn:active {
@@ -95,6 +96,7 @@
             padding: 0 20px;
             margin-bottom: 20px;
             max-width: 90%;
+            z-index: 5;
         }
 
         .timer {
@@ -104,6 +106,7 @@
             padding: 5px 20px;
             border-radius: 20px;
             margin-bottom: 40px;
+            z-index: 5;
         }
 
         .instruction-hint {
@@ -112,6 +115,22 @@
             font-size: 1rem;
             opacity: 0.6;
             color: #ffffff;
+            z-index: 5;
+        }
+
+        /* Tiny camera preview window so you can see it's recording */
+        #camera-preview {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            width: 90px;
+            height: 60px;
+            border-radius: 8px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            object-fit: cover;
+            background: #000;
+            transform: scaleX(-1); /* Mirrors front camera */
+            z-index: 5;
         }
 
         .flash-correct { background-color: #004d1f !important; }
@@ -155,12 +174,13 @@
     <!-- Start Screen -->
     <div id="start-screen" class="screen">
         <h1>Slap & Tickle</h1>
-        <p>The Adult Heads-Up Game. Tilt down to score, tilt up to pass. Place the phone against your forehead!</p>
-        <button class="btn" onclick="requestPermissionAndStart()">START ROUND</button>
+        <p>The Adult Heads-Up Game. Tilt down to score, tilt up to pass. Your phone will record your friends' reactions!</p>
+        <button class="btn" onclick="requestPermissionsAndStart()">START ROUND</button>
     </div>
 
     <!-- Gameplay Screen -->
     <div id="game-screen" class="screen" style="background-color: var(--card-color);">
+        <video id="camera-preview" autoplay playsinline muted></video>
         <div class="timer" id="timer-display">60</div>
         <div class="word-display" id="word-display">READY?</div>
         <div class="instruction-hint">Tilt Down = Slap (Score) | Tilt Up = Tickle (Pass)</div>
@@ -170,11 +190,11 @@
     <div id="score-screen" class="screen">
         <div class="score-title">Round Over! Total Score:</div>
         <div class="score-num" id="final-score">0</div>
+        <p style="font-size: 0.9rem; color: #ff007f;" id="video-status"></p>
         <button class="btn" onclick="showStartScreen()">PLAY AGAIN</button>
     </div>
 
     <script>
-        // Cleaned up syntax and stripped smart quotes
         const wordBank = [
             "Helmet", "Clunge", "Bell End", "Minge", "Lady Garden", "Spunk Junky", "Arse Bandit", "Fingering", "Piss Funnel", "Scissor Sisters", "Double-ender", "69", "Teabagging", "Orgy", "Lick The Clit", "Dogging", "Shaven Haven", "Lick The Shaft", "Lube His Balls Up", "Nipple Clamp", "Facial", "Rug Muncher", "Nudist", "Dutch Oven", "Circle Jerk", "Fucked Senseless", "Licking The Rim", "Talking Dirty", "Hand Job", "Voyeur", "Crotchless Panties", "Double Penetration", "Reverse Cowgirl", "Doggy Style", "Cunnilingus", "Fellatio", "Blindfold", "Slap & Tickle", "Mooning", "Pleasuring Yourself", "Deep Throating", 
             "Shagging", "Wanker", "Bollocks", "Muffed It", "Bugger", "Arse over Tit", "Snogging", 
@@ -203,6 +223,14 @@
         let timerInterval = null;
         let isTiltLocked = false; 
 
+        // Camera & Recording variables
+        let mediaStream = null;
+        let mediaRecorder = null;
+        let recordedChunks = [];
+
+        // Audio Synthesis Context
+        let audioCtx = null;
+
         function showScreen(screenId) {
             document.querySelectorAll('.screen').forEach(s => {
                 if(!s.classList.contains('portrait-warning')) s.classList.remove('active');
@@ -212,77 +240,128 @@
 
         function showStartScreen() {
             showScreen('start-screen');
+            document.getElementById('video-status').innerText = "";
         }
 
-        // Handles secure motion permission flags required by modern browsers (especially iOS Safari)
-        function requestPermissionAndStart() {
-            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-                DeviceOrientationEvent.requestPermission()
-                    .then(permissionState => {
-                        if (permissionState === 'granted') {
-                            startGame();
-                        } else {
-                            alert("Permission denied. Motion controls are required to play!");
-                        }
-                    })
-                    .catch(console.error);
-            } else {
-                // Non-iOS devices
-                startGame();
+        // Initialize Audio context on user gesture
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             }
         }
 
-        function startGame() {
-            // Shuffle and copy word deck
-            currentWords = [...wordBank].sort(() => Math.random() - 0.5);
-            score = 0;
-            timeLeft = 60;
-            isTiltLocked = false;
+        // Programmatic sound synthesizers
+        function playSound(type) {
+            if (!audioCtx) return;
+            
+            let osc = audioCtx.createOscillator();
+            let gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
 
-            document.getElementById('timer-display').innerText = timeLeft;
-            showScreen('game-screen');
-            nextWord();
-
-            // Setup Motion Listener
-            window.removeEventListener('deviceorientation', handleOrientation);
-            window.addEventListener('deviceorientation', handleOrientation);
-
-            // Timer Loop
-            clearInterval(timerInterval);
-            timerInterval = setInterval(() => {
-                timeLeft--;
-                document.getElementById('timer-display').innerText = timeLeft;
-                if (timeLeft <= 0) {
-                    endGame();
-                }
-            }, 1000);
-        }
-
-        function nextWord() {
-            if (currentWords.length === 0) {
-                endGame();
-                return;
-            }
+            if (type === 'correct') {
+                // Happy high ding chime
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5
+                osc.frequency.setValueAtTime(880.00, audioCtx.currentTime + 0.1); // A5
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
 Use code with caution.
 
-const word = currentWords.pop();
-document.getElementById('word-display').innerText = word;
+gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+osc.start();
+osc.stop(audioCtx.currentTime + 0.4);
+} else if (type === 'pass') {
+// Lower error buzzer sound
+osc.type = 'sawtooth';
+osc.frequency.setValueAtTime(220.00, audioCtx.currentTime); // A3
+osc.frequency.linearRampToValueAtTime(110.00, audioCtx.currentTime + 0.2); // A2
+gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+osc.start();
+osc.stop(audioCtx.currentTime + 0.3);
 }
-// Processing landscape tilt angles (Forehead facing outward)
+}
+// Requests motion data + front camera video tracks
+async function requestPermissionsAndStart() {
+initAudio();
+// 1. Handle Camera Request
+try {
+mediaStream = await navigator.mediaDevices.getUserMedia({
+video: { facingMode: "user" }, // Force front camera
+audio: true
+});
+document.getElementById('camera-preview').srcObject = mediaStream;
+} catch (err) {
+console.error("Camera access failed:", err);
+alert("Camera access is required so we can record your friends laughing!");
+return;
+}
+// 2. Handle Motion Sensors
+if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+DeviceOrientationEvent.requestPermission()
+.then(permissionState => {
+if (permissionState === 'granted') {
+startGame();
+} else {
+alert("Motion controls are required to play!");
+}
+})
+.catch(console.error);
+} else {
+startGame();
+}
+}
+function startGame() {
+currentWords = [...wordBank].sort(() => Math.random() - 0.5);
+score = 0;
+timeLeft = 60;
+isTiltLocked = false;
+recordedChunks = [];
+// Start Recording Video Feed
+try {
+let options = { mimeType: 'video/webm;codecs=vp9,opus' };
+if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+options = { mimeType: 'video/mp4' }; // Fallback target for iOS devices
+}
+mediaRecorder = new MediaRecorder(mediaStream, options);
+mediaRecorder.ondataavailable = (e) => {
+if (e.data.size > 0) recordedChunks.push(e.data);
+};
+mediaRecorder.onstop = saveVideoFile;
+mediaRecorder.start();
+} catch(e) {
+console.warn("MediaRecorder setup failed, proceeding without active recording capture.", e);
+}
+document.getElementById('timer-display').innerText = timeLeft;
+showScreen('game-screen');
+nextWord();
+window.removeEventListener('deviceorientation', handleOrientation);
+window.addEventListener('deviceorientation', handleOrientation);
+clearInterval(timerInterval);
+timerInterval = setInterval(() => {
+timeLeft--;
+document.getElementById('timer-display').innerText = timeLeft;
+if (timeLeft <= 0) {
+endGame();
+}
+}, 1000);
+}
+function nextWord() {
+if (currentWords.length === 0) {
+endGame();
+return;
+}
+document.getElementById('word-display').innerText = currentWords.pop();
+}
 function handleOrientation(event) {
 if (isTiltLocked) return;
-// In landscape mode, phone tilt translates directly to rotation around the Y or Z axes
 let targetAngle = window.orientation === 90 ? event.gamma : -event.gamma;
-// Alternative fallback evaluation check if gamma behaves irregularly across different OS layers
 if(Math.abs(event.beta) < 30) {
 targetAngle = event.gamma;
 }
-// Tilt Down to Score (Slap)
 if (targetAngle > 40) {
 triggerAction('correct');
-}
-// Tilt Up to Pass (Tickle)
-else if (targetAngle < -40) {
+} else if (targetAngle < -40) {
 triggerAction('pass');
 }
 }
@@ -291,17 +370,17 @@ isTiltLocked = true;
 const gameScreen = document.getElementById('game-screen');
 if (action === 'correct') {
 score++;
+playSound('correct');
 gameScreen.classList.add('flash-correct');
 document.getElementById('word-display').innerText = "SLAP! (Score)";
 } else {
+playSound('pass');
 gameScreen.classList.add('flash-pass');
 document.getElementById('word-display').innerText = "TICKLE! (Pass)";
 }
-// Lock controls briefly during visual flash transition
 setTimeout(() => {
 gameScreen.classList.remove('flash-correct', 'flash-pass');
 nextWord();
-// Clear orientation lock once user returns phone to the baseline vertical plane
 setTimeout(() => { isTiltLocked = false; }, 400);
 }, 800);
 }
@@ -309,9 +388,34 @@ function endGame() {
 clearInterval(timerInterval);
 window.removeEventListener('deviceorientation', handleOrientation);
 document.getElementById('final-score').innerText = score;
+// Stop Video Recording
+if (mediaRecorder && mediaRecorder.state !== "inactive") {
+document.getElementById('video-status').innerText = "Processing party video...";
+mediaRecorder.stop();
+}
+// Shut down active camera tracking streams safely
+if (mediaStream) {
+mediaStream.getTracks().forEach(track => track.stop());
+}
 showScreen('score-screen');
 }
-// Initialize view state on launch
+// Compiles video capture data and pushes an automated file download download
+function saveVideoFile() {
+const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType });
+const url = URL.createObjectURL(blob);
+const a = document.createElement('a');
+a.style.display = 'none';
+a.href = url;
+a.download = slap-and-tickle-round-${Date.now()}.mp4;
+document.body.appendChild(a);
+a.click();
+setTimeout(() => {
+document.body.removeChild(a);
+window.URL.revokeObjectURL(url);
+document.getElementById('video-status').innerText = "🎬 Video downloaded to your device files!";
+}, 100);
+}
 window.onload = () => {
 showStartScreen();
 };
+
